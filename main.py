@@ -320,6 +320,22 @@ async def send_movie(message, movie):
         await message.answer(caption, parse_mode="Markdown", reply_markup=main_keyboard())
 
 
+async def send_movie_with_suggestions(message, movies):
+    if not movies:
+        await message.answer("Фильмы не найдены", reply_markup=main_keyboard())
+        return
+    await send_movie(message, movies[0])
+    if len(movies) > 1:
+        additional = "\n".join(
+            f"{i+1}. {m['movie']} ({m['year']})" for i, m in enumerate(movies[1:], 1)
+        )
+        await message.answer(
+            f"Ещё варианты:\n{additional}",
+            parse_mode="Markdown",
+            reply_markup=main_keyboard()
+        )
+
+
 async def send_mood_results(message_or_callback_message, genres, label):
     movies_found = find_by_genres(genres, 5)
     if not movies_found:
@@ -397,9 +413,11 @@ async def rating_search(message: Message):
 
 @dp.message(F.text == "🎲 Случайные фильмы")
 async def random_movies_handler(message: Message):
-    random_movies = get_random_movies(3)
+    random_movies = get_random_movies(5)
     if random_movies:
-        await send_movie(message, random_movies[0])
+        await send_movie_with_suggestions(message, random_movies)
+    else:
+        await message.answer("Фильмы не найдены", reply_markup=main_keyboard())
 
 
 @dp.message(F.text == "🎭 Подобрать по настроению")
@@ -506,20 +524,7 @@ async def combo_process_country(callback: CallbackQuery, state: FSMContext):
     results = get_filtered_movies(genre, year_range, selected_country, 5)
     await callback.message.delete()
     if results:
-        movie = results[0]
-        caption = format_movie_caption(movie)
-        poster_url = get_movie_poster(movie)
-        if poster_url and poster_url.startswith('http'):
-            await callback.message.answer_photo(photo=poster_url, caption=caption, parse_mode="Markdown", reply_markup=main_keyboard())
-        else:
-            await callback.message.answer(caption, parse_mode="Markdown", reply_markup=main_keyboard())
-        if len(results) > 1:
-            additional = "\n".join([f"{i+1}. {m['movie']} ({m['year']})" for i, m in enumerate(results[1:], 1)])
-            await callback.message.answer(
-                f"Ещё фильмы:\n{additional}",
-                parse_mode="Markdown",
-                reply_markup=main_keyboard()
-            )
+        await send_movie_with_suggestions(callback.message, results)
     else:
         await callback.message.answer("Фильмы не найдены", parse_mode="Markdown", reply_markup=main_keyboard())
     await state.clear()
@@ -541,46 +546,42 @@ async def combo_cancel(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(lambda c: c.data.startswith("genre_"))
 async def handle_genre(callback: CallbackQuery):
     genre = callback.data.replace("genre_", "")
-    result = find_by_genre(genre, 1)
+    results = find_by_genre(genre, 5)
     await callback.message.delete()
-    if result:
-        await send_movie(callback.message, result[0])
+    if results:
+        await send_movie_with_suggestions(callback.message, results)
     await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("year_"))
 async def handle_year(callback: CallbackQuery):
     year_name = callback.data.replace("year_", "")
-    year_range = None
-    for yr in YEAR_RANGES:
-        if yr["name"] == year_name:
-            year_range = yr
-            break
+    year_range = next((yr for yr in YEAR_RANGES if yr["name"] == year_name), None)
     if year_range:
-        result = find_by_year_range(year_range, 1)
+        results = find_by_year_range(year_range, 5)
         await callback.message.delete()
-        if result:
-            await send_movie(callback.message, result[0])
+        if results:
+            await send_movie_with_suggestions(callback.message, results)
     await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("country_"))
 async def handle_country(callback: CallbackQuery):
     country = callback.data.replace("country_", "")
-    result = find_by_country(country, 1)
+    results = find_by_country(country, 5)
     await callback.message.delete()
-    if result:
-        await send_movie(callback.message, result[0])
+    if results:
+        await send_movie_with_suggestions(callback.message, results)
     await callback.answer()
 
 
 @dp.callback_query(lambda c: c.data.startswith("rating_"))
 async def handle_rating(callback: CallbackQuery):
     rating = float(callback.data.replace("rating_", ""))
-    result = find_by_rating(rating, 1)
+    results = find_by_rating(rating, 5)
     await callback.message.delete()
-    if result:
-        await send_movie(callback.message, result[0])
+    if results:
+        await send_movie_with_suggestions(callback.message, results)
     await callback.answer()
 
 
