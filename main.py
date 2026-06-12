@@ -339,7 +339,7 @@ async def send_mood_results(message_or_callback_message, genres, label):
         )
 
 
-BOT_TOKEN = "8901299599:AAEEtEVGx1_Ox8Yl0aCjBnkMest1xWzB_jg"
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=MemoryStorage())
